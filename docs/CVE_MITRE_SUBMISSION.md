@@ -1,45 +1,99 @@
-# MITRE CVE Submission — IEC 62351-6 CIL-DoS
+# CVE Submission — IEC 62351-6 CIL-DoS
 ## Protocol-Level Vulnerability in IEC 62351-6 Cryptographic Authentication
 
-> **Submission Target:** MITRE CVE Program (https://cveform.mitre.org/)
 > **Precedent:** CVE-2017-13077 (KRACK — WPA2 protocol-level vulnerability)
 > **Status:** READY — Pi 5 hardware evidence complete (October 22, 2026)
 
 ---
 
-## CVE Request Form Fields
+## Submission Routes (in priority order)
 
-### 1. Request Type
+### Route A — CISA VINCE-NT (RECOMMENDED)
+
+> **Why this route:** CISA is the **Root CNA for Industrial Control Systems**.
+> IEC is NOT a CNA and cannot assign CVE IDs. For ICS/OT protocol
+> vulnerabilities, CISA is the correct authority. KRACK went through
+> CERT/CC (CISA's predecessor) — we should follow the same path.
+
+- **Portal:** https://vulnerabilities.cisa.gov/vincent/auth/login/
+- **Email (backup):** cvd@cisa.dhs.gov
+- **Process:**
+  1. Create account on VINCE-NT
+  2. Submit vulnerability report (details below)
+  3. CISA triages (checks legitimacy, scope, actionability)
+  4. CISA coordinates with IEC TC 57 / affected vendors
+  5. CISA assigns CVE ID (they are the ICS Root CNA)
+  6. CISA publishes ICS Advisory (ICSA-XX-XXX-XX)
+- **Timeline:** CISA may disclose as early as 45 days after first
+  contact if the vendor (IEC) is unresponsive.
+
+### Route B — MITRE CNA-LR (Backup)
+
+> **Note:** The legacy form at cveform-legacy.mitre.org is deprecated
+> on **November 1, 2026**. The new portal uses Google login.
+
+- **New Portal:** https://mitre.github.io/mitre-cve-roles/cve-id-request/
+  (Google or GitLab login → Reserve CAN → Enter details → Submit)
+- **Required fields:**
+  - Problem types
+  - Vendor or project
+  - Product name
+  - Version
+  - Vulnerability description
+  - References URL
+  - CVSS 4.0 or 3.1 (optional but recommended)
+- **Process:**
+  1. Log in with Google
+  2. Click "Reserve One CAN" → receive CAN-YYYY-####### tracking number
+  3. Fill in vulnerability details (Vulnogram format)
+  4. Add CVSS metrics
+  5. Press "Submit Request"
+  6. CNA-LR team reviews → assigns CVE ID if accepted
+- **Emails to whitelist:** cve-request@mitre.org, cve@mitre.org
+
+### Recommended Strategy
+
 ```
-Report a new vulnerability / request a CVE ID
+1. Submit to CISA VINCE-NT first (they own ICS CVE assignment)
+2. If CISA does not respond within 30 days, submit to MITRE CNA-LR
+3. Reference the CISA submission in the MITRE request
+4. Send IEC TC 57 WG 15 disclosure letter in parallel
 ```
 
-### 2. Vulnerability Type
+---
+
+## Vulnerability Report (for CISA VINCE-NT and/or MITRE CNA-LR)
+
+### Problem Type / Vulnerability Type
 ```
-Protocol Design Flaw — Computational Denial of Service
+CWE-400: Uncontrolled Resource Consumption
+(secondary: CWE-770: Allocation of Resources Without Limits or Throttling)
+
+Protocol Design Flaw — Computational Denial of Service against
+safety-critical real-time system
 ```
 
-### 3. Vendor of the Product
+### Vendor / Project
 ```
 International Electrotechnical Commission (IEC)
 Technical Committee 57 (TC 57) — Power Systems Management
 Working Group 15 (WG 15) — Data and Communication Security
 ```
 
-### 4. Affected Product / Standard
+### Product
 ```
-IEC 62351-6:2020 — Power systems management and associated information
+IEC 62351-6 — Power systems management and associated information
 exchange — Data and communications security — Part 6: Security for
 IEC 61850 profiles
 
-Specifically: Sections defining cryptographic authentication profiles
-for GOOSE (Generic Object Oriented Substation Event) messages, including
-RSA-2048 digital signatures, ECDSA-P256 digital signatures, and
-HMAC-SHA-256 message authentication codes applied to IEC 61850 GOOSE
-multicast frames (EtherType 0x88B8).
+Specifically: Cryptographic authentication profiles for GOOSE (Generic
+Object Oriented Substation Event) messages, including RSA-2048 digital
+signatures, ECDSA-P256 digital signatures, and HMAC-SHA-256 message
+authentication codes applied to IEC 61850 GOOSE multicast frames
+(EtherType 0x88B8).
 ```
 
-### 5. Version(s) Affected
+### Version
 ```
 IEC 62351-6:2020 (current edition)
 IEC 62351-6:2007 (previous edition)
@@ -50,7 +104,7 @@ The vulnerability is inherent to the standard's design — any compliant
 implementation on resource-constrained IED hardware is vulnerable.
 ```
 
-### 6. Vulnerability Description
+### Description
 ```
 IEC 62351-6 mandates cryptographic authentication (digital signatures
 or MACs) on IEC 61850 GOOSE protection messages in electrical
@@ -88,7 +142,7 @@ Physical consequences of delayed trip commands include:
   - Potential cascading blackout
 ```
 
-### 7. Attack Vector
+### CVSS Metrics
 ```
 CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H
 
@@ -112,7 +166,7 @@ blackout) is not captured by CVSS 3.1 but would be classified as
 Safety: Catastrophic under IEC 62443 consequence assessment.
 ```
 
-### 8. Discovery Details
+### Discovery Details
 ```
 Discoverers:
   - Dr. Sapna Vikram Mewundi (PES University, Bengaluru, India)
@@ -131,7 +185,7 @@ Disclosure Timeline:
   - [TARGET]: Coordinated public disclosure at Black Hat Asia 2027 (March 2027)
 ```
 
-### 9. Proof of Concept / Evidence
+### References URL / Proof of Concept
 ```
 All evidence is publicly reproducible:
 
@@ -171,7 +225,7 @@ All evidence is publicly reproducible:
    Demonstrates the vulnerability is real AND mitigable.
 ```
 
-### 10. Has the vendor been notified?
+### Vendor Notification Status
 ```
 Partially. The findings have been submitted to IEEE Transactions on
 Smart Grid for academic peer review (October 7, 2026). Direct
@@ -183,7 +237,7 @@ vulnerability is in the standard's design, not in any particular
 vendor's implementation. All compliant implementations are affected.
 ```
 
-### 11. References
+### References
 ```
 - IEC 62351-6:2020 standard specification
 - IEC 61850-8-1 (GOOSE protocol specification)
@@ -206,7 +260,8 @@ vendor's implementation. All compliant implementations are affected.
 - [x] Adaptive attacker module (DONE — gridpulse/attacks/adaptive_cildos.py)
 - [ ] IEC TC 57 WG 15 disclosure letter sent (DRAFT READY — docs/IEC_TC57_DISCLOSURE_LETTER.md)
 - [x] Academic paper submitted (DONE — IEEE TSG, Oct 7 2026)
-- [ ] MITRE CVE form submitted (READY TO SUBMIT)
+- [ ] CISA VINCE-NT submission (READY — recommended route for ICS)
+- [ ] MITRE CNA-LR submission (BACKUP — if CISA unresponsive)
 - [x] Black Hat Asia 2027 submission (IN PORTAL — editing)
 
 ---
@@ -226,9 +281,12 @@ Phase 2 (NEXT — when USB-C Ethernet adapter arrives):
   ⬜ Run native CIL-DoS attack simulation on Pi 5
   ⬜ Run XDP/eBPF defense on Pi 5
 
-Phase 3 (SUBMIT):
-  ⬜ Send IEC TC 57 WG 15 disclosure letter
-  ⬜ Submit MITRE CVE request form
+Phase 3 (SUBMIT — before November 1, 2026):
+  ⬜ Submit to CISA VINCE-NT (https://vulnerabilities.cisa.gov)
+      → CISA is the ICS Root CNA, correct authority for IEC 62351
+  ⬜ Send IEC TC 57 WG 15 disclosure letter (in parallel)
+  ⬜ If CISA unresponsive in 30 days → submit to MITRE CNA-LR
+      → Legacy form deprecated Nov 1, 2026; use new Google-login portal
   ⬜ Request 90-day coordinated disclosure window
 
 Phase 4 (OPTIONAL — if university has relay access):
