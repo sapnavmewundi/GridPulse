@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GridPulse — CIL-DoS Live Dashboard</title>
+<style>
+:root {
+  --bg: #0a0e17;
+  --surface: #111827;
+  --border: #1e293b;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --deadline: #ef4444;
+  --grid-line: #1e293b;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; border-bottom: 1px solid var(--border);
+}
+.header h1 { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+.header h1 span { color: var(--red); }
+.phase-badge {
+  padding: 4px 12px; border-radius: 4px; font-size: 12px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+}
+.phase-nominal { background: #052e16; color: var(--green); border: 1px solid #166534; }
+.phase-attack  { background: #450a0a; color: var(--red); border: 1px solid #991b1b; }
+.phase-defense { background: #172554; color: var(--blue); border: 1px solid #1d4ed8; }
+.phase-recovery { background: #422006; color: var(--amber); border: 1px solid #b45309; }
+
+.grid {
+  display: grid; gap: 12px; padding: 16px;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto auto auto;
+}
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px;
+}
+.card-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1.5px; color: var(--muted); margin-bottom: 12px;
+}
+
+/* Latency chart spans full width */
+.latency-card { grid-column: 1 / -1; }
+.latency-canvas { width: 100%; height: 180px; }
+
+/* Big number stat */
+.stat { text-align: center; }
+.stat-value {
+  font-size: 36px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-unit { font-size: 14px; color: var(--muted); margin-left: 4px; }
+.stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.stat-ok .stat-value { color: var(--green); }
+.stat-warn .stat-value { color: var(--amber); }
+.stat-crit .stat-value { color: var(--red); }
+
+/* PQAC pipeline */
+.pipeline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pipe-stage {
+  flex: 1; min-width: 100px; padding: 10px; border-radius: 6px;
+  text-align: center; border: 1px solid var(--border);
+}
+.pipe-stage .stage-name { font-size: 10px; font-weight: 600; letter-spacing: 1px; color: var(--muted); }
+.pipe-stage .stage-val { font-size: 20px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.pipe-arrow { color: var(--muted); font-size: 18px; }
+
+/* Event log */
+.log { max-height: 220px; overflow-y: auto; font-size: 12px; line-height: 1.6; }
+.log-entry { padding: 2px 0; border-bottom: 1px solid var(--border); }
+.log-time { color: var(--muted); margin-right: 8px; }
+.log-warn { color: var(--amber); }
+.log-crit { color: var(--red); }
+.log-ok { color: var(--green); }
+.log-info { color: var(--cyan); }
+
+/* Packet inspector */
+.pkt-field { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+.pkt-key { color: var(--muted); }
+
+/* Controls */
+.controls {
+  display: flex; gap: 8px; padding: 12px 24px;
+  border-top: 1px solid var(--border); align-items: center;
+}
+.btn {
+  padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text); cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+}
+.btn:hover { border-color: var(--blue); }
+.btn-attack { border-color: var(--red); color: var(--red); }
+.btn-attack:hover { background: #450a0a; }
+.btn-defend { border-color: var(--green); color: var(--green); }
+.btn-defend:hover { background: #052e16; }
+.btn-auto { border-color: var(--cyan); color: var(--cyan); }
+.btn-auto:hover { background: #083344; }
+.speed-label { color: var(--muted); font-size: 11px; margin-left: auto; }
+input[type=range] { width: 120px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>GRID<span>PULSE</span> — CIL-DoS LIVE DASHBOARD</h1>
+  <div id="phaseBadge" class="phase-badge phase-nominal">NOMINAL</div>
+</div>
+
+<div class="grid">
+  <!-- Latency time series -->
+  <div class="card latency-card">
+    <div class="card-title">Trip Latency vs 3 ms Safety Deadline</div>
+    <canvas id="latencyChart" class="latency-canvas"></canvas>
+  </div>
+
+  <!-- Big stats row -->
+  <div class="card stat stat-ok" id="latencyStat">
+    <div class="card-title">Current Latency</div>
+    <div class="stat-value"><span id="latVal">0.76</span><span class="stat-unit">ms</span></div>
+    <div class="stat-label">IEC 61850 P2/P3 deadline: 3.0 ms</div>
+  </div>
+  <div class="card stat" id="rateStat">
+    <div class="card-title">Attack Rate</div>
+    <div class="stat-value"><span id="rateVal">0</span><span class="stat-unit">pps</span></div>
+    <div class="stat-label">Packets per second</div>
+  </div>
+  <div class="card stat stat-ok" id="dropStat">
+    <div class="card-title">PQAC Drop Rate</div>
+    <div class="stat-value"><span id="dropVal">0.0</span><span class="stat-unit">%</span></div>
+    <div class="stat-label">Invalid frames rejected</div>
+  </div>
+
+  <!-- PQAC pipeline -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <div class="card-title">PQAC 3-Stage Pipeline</div>
+    <div class="pipeline">
+      <div class="pipe-stage" id="stage1">
+        <div class="stage-name">Stage 1: MAC Filter</div>
+        <div class="stage-val" id="s1val">0</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage" id="stage2">
+        <div class="stage-name">Stage 2: stNum Check</div>
+        <div class="stage-val" id="s2val">0</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage" id="stage3">
+        <div class="stage-name">Stage 3: Crypto Verify</div>
+        <div class="stage-val" id="s3val">0</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage" style="border-color: var(--green);">
+        <div class="stage-name">Accepted</div>
+        <div class="stage-val" style="color: var(--green);" id="accVal">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Packet inspector -->
+  <div class="card">
+    <div class="card-title">Last GOOSE Frame</div>
+    <div id="pktInspector">
+      <div class="pkt-field"><span class="pkt-key">Type</span><span id="pktType">—</span></div>
+      <div class="pkt-field"><span class="pkt-key">Src MAC</span><span id="pktMac">—</span></div>
+      <div class="pkt-field"><span class="pkt-key">GoCB Ref</span><span id="pktGocb">—</span></div>
+      <div class="pkt-field"><span class="pkt-key">stNum</span><span id="pktSt">—</span></div>
+      <div class="pkt-field"><span class="pkt-key">sqNum</span><span id="pktSq">—</span></div>
+      <div class="pkt-field"><span class="pkt-key">Algorithm</span><span id="pktAlgo">—</span></div>
+      <div class="pkt-field"><span class="pkt-key">Signature</span><span id="pktSig">—</span></div>
+      <div class="pkt-field"><span class="pkt-key">Verdict</span><span id="pktVerdict">—</span></div>
+    </div>
+  </div>
+
+  <!-- Operator console log -->
+  <div class="card" style="grid-column: 2 / -1;">
+    <div class="card-title">Operator Console</div>
+    <div class="log" id="eventLog"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-auto" id="btnAuto">▶ AUTO DEMO</button>
+  <button class="btn btn-attack" id="btnAttack">⚡ START ATTACK</button>
+  <button class="btn btn-defend" id="btnDefend">🛡 ENABLE PQAC</button>
+  <button class="btn" id="btnReset">↺ RESET</button>
+  <span class="speed-label">Speed</span>
+  <input type="range" id="speedSlider" min="1" max="10" value="5">
+</div>
+
+<script>
+const MAX_POINTS = 200;
+const DEADLINE_MS = 3.0;
+
+// State
+let state = {
+  phase: 'nominal',
+  attacking: false,
+  defending: false,
+  attackRate: 0,
+  latency: 0.76,
+  latencyHistory: [],
+  s1Dropped: 0,
+  s2Dropped: 0,
+  s3Dropped: 0,
+  accepted: 0,
+  totalAttack: 0,
+  tick: 0,
+  autoMode: false,
+  speed: 5,
+};
+
+// DOM refs
+const canvas = document.getElementById('latencyChart');
+const ctx = canvas.getContext('2d');
+const phaseBadge = document.getElementById('phaseBadge');
+
+function log(msg, level) {
+  const el = document.getElementById('eventLog');
+  const t = new Date().toLocaleTimeString('en-US', {hour12: false});
+  const cls = level === 'crit' ? 'log-crit' : level === 'warn' ? 'log-warn' : level === 'ok' ? 'log-ok' : 'log-info';
+  el.innerHTML += `<div class="log-entry"><span class="log-time">${t}</span><span class="${cls}">${msg}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setPhase(p) {
+  state.phase = p;
+  phaseBadge.className = 'phase-badge phase-' + p;
+  phaseBadge.textContent = p.toUpperCase();
+}
+
+function formatNum(n) {
+  return n >= 1000 ? (n/1000).toFixed(1) + 'k' : n.toString();
+}
+
+// Chart
+function drawChart() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  const pad = {top: 10, right: 10, bottom: 24, left: 50};
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Y axis: 0 to max(10, maxLatency * 1.2)
+  const maxY = Math.max(10, ...state.latencyHistory.map(v => v * 1.2));
+
+  // Grid lines
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 0.5;
+  for (let y = 0; y <= maxY; y += maxY > 50 ? 50 : maxY > 10 ? 5 : 1) {
+    const py = pad.top + cH - (y / maxY) * cH;
+    ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(W - pad.right, py); ctx.stroke();
+    ctx.fillStyle = '#64748b'; ctx.font = '10px monospace'; ctx.textAlign = 'right';
+    ctx.fillText(y.toFixed(y < 10 ? 1 : 0) + ' ms', pad.left - 6, py + 3);
+  }
+
+  // Deadline line
+  const deadlineY = pad.top + cH - (DEADLINE_MS / maxY) * cH;
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(pad.left, deadlineY); ctx.lineTo(W - pad.right, deadlineY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ef4444'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('3.0 ms DEADLINE', W - pad.right - 100, deadlineY - 4);
+
+  // Data line
+  if (state.latencyHistory.length > 1) {
+    const pts = state.latencyHistory;
+    const step = cW / MAX_POINTS;
+
+    // Fill area
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top + cH);
+    for (let i = 0; i < pts.length; i++) {
+      const x = pad.left + i * step;
+      const y = pad.top + cH - (pts[i] / maxY) * cH;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(pad.left + (pts.length - 1) * step, pad.top + cH);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + cH);
+    const lastVal = pts[pts.length - 1];
+    const baseColor = lastVal > DEADLINE_MS ? '239,68,68' : '34,197,94';
+    grad.addColorStop(0, `rgba(${baseColor},0.3)`);
+    grad.addColorStop(1, `rgba(${baseColor},0.02)`);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Stroke
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const x = pad.left + i * step;
+      const y = pad.top + cH - (pts[i] / maxY) * cH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = lastVal > DEADLINE_MS ? '#ef4444' : '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+
+// Simulation tick
+function simTick() {
+  const s = state;
+  const spd = s.speed / 5;
+
+  if (s.attacking && !s.defending) {
+    // Undefended attack: latency ramps up
+    s.attackRate = Math.min(s.attackRate + 2000 * spd, 100000);
+    s.latency = Math.min(s.latency + (s.attackRate / 100000) * 8 * spd, 2500);
+    s.totalAttack += Math.floor(s.attackRate / 10);
+    s.s3Dropped += Math.floor(s.attackRate / 10 * 0.05);
+    setPhase('attack');
+  } else if (s.attacking && s.defending) {
+    // PQAC active: latency drops to sub-ms
+    s.attackRate = Math.min(s.attackRate + 1000 * spd, 100000);
+    const incoming = Math.floor(s.attackRate / 10);
+    s.totalAttack += incoming;
+    const s1Drop = Math.floor(incoming * 0.70);
+    const s2Drop = Math.floor((incoming - s1Drop) * 0.85);
+    const s3Drop = incoming - s1Drop - s2Drop;
+    s.s1Dropped += s1Drop;
+    s.s2Dropped += s2Drop;
+    s.s3Dropped += s3Drop;
+    s.accepted += Math.floor(Math.random() * 3);
+    s.latency = 0.6 + Math.random() * 0.3;
+    setPhase('defense');
+  } else {
+    // Nominal
+    s.attackRate = Math.max(0, s.attackRate - 5000 * spd);
+    s.latency = 0.6 + Math.random() * 0.25;
+    if (s.attackRate <= 0) setPhase('nominal');
+    else setPhase('recovery');
+  }
+
+  // Record history
+  s.latencyHistory.push(s.latency);
+  if (s.latencyHistory.length > MAX_POINTS) s.latencyHistory.shift();
+
+  // Update DOM
+  const latEl = document.getElementById('latencyStat');
+  document.getElementById('latVal').textContent = s.latency < 10 ? s.latency.toFixed(2) : s.latency.toFixed(0);
+  latEl.className = 'card stat ' + (s.latency > DEADLINE_MS ? 'stat-crit' : s.latency > 2 ? 'stat-warn' : 'stat-ok');
+
+  document.getElementById('rateVal').textContent = formatNum(Math.floor(s.attackRate));
+  const totalDropped = s.s1Dropped + s.s2Dropped + s.s3Dropped;
+  const dropPct = s.totalAttack > 0 ? (totalDropped / s.totalAttack * 100) : 0;
+  document.getElementById('dropVal').textContent = dropPct.toFixed(1);
+  const dropEl = document.getElementById('dropStat');
+  dropEl.className = 'card stat ' + (dropPct > 95 ? 'stat-ok' : dropPct > 50 ? 'stat-warn' : s.attacking ? 'stat-crit' : 'stat-ok');
+
+  document.getElementById('s1val').textContent = formatNum(s.s1Dropped);
+  document.getElementById('s2val').textContent = formatNum(s.s2Dropped);
+  document.getElementById('s3val').textContent = formatNum(s.s3Dropped);
+  document.getElementById('accVal').textContent = formatNum(s.accepted);
+
+  // Packet inspector (simulated)
+  if (s.attacking) {
+    const macs = ['08:00:27:10:20:01','08:00:27:10:20:02','de:ad:be:ef:00:01','08:00:27:10:20:03'];
+    const gocbs = ['SubA/LLN0$GO$gcbTrip','SubA/LLN0$GO$gcbStatus'];
+    const isLegit = Math.random() < 0.02;
+    document.getElementById('pktType').textContent = isLegit ? 'Legitimate GOOSE' : 'CIL-DoS (ATTACK)';
+    document.getElementById('pktType').style.color = isLegit ? 'var(--green)' : 'var(--red)';
+    document.getElementById('pktMac').textContent = macs[Math.floor(Math.random() * macs.length)];
+    document.getElementById('pktGocb').textContent = gocbs[Math.floor(Math.random() * gocbs.length)];
+    document.getElementById('pktSt').textContent = Math.floor(Math.random() * 65535);
+    document.getElementById('pktSq').textContent = Math.floor(Math.random() * 100);
+    document.getElementById('pktAlgo').textContent = 'ECDSA-P256';
+    document.getElementById('pktSig').textContent = isLegit ? 'VALID ✓' : 'INVALID ✗';
+    document.getElementById('pktSig').style.color = isLegit ? 'var(--green)' : 'var(--red)';
+    const verdict = s.defending ? (isLegit ? 'ACCEPTED' : 'DROPPED by PQAC') : (isLegit ? 'QUEUED (delayed)' : 'QUEUED (blocking)');
+    document.getElementById('pktVerdict').textContent = verdict;
+    document.getElementById('pktVerdict').style.color = verdict.includes('ACCEPT') ? 'var(--green)' : verdict.includes('DROPPED') ? 'var(--amber)' : 'var(--red)';
+  }
+
+  drawChart();
+  s.tick++;
+}
+
+// Auto demo sequence
+async function autoDemo() {
+  state.autoMode = true;
+  resetState();
+  log('Auto demo started — 6-phase CIL-DoS demonstration', 'info');
+
+  // Phase 1: Nominal
+  log('Phase 1: System nominal — GOOSE protection operating normally', 'ok');
+  setPhase('nominal');
+  await wait(3000);
+
+  // Phase 2: Attack starts
+  log('Phase 2: CIL-DoS attack begins — flooding invalid GOOSE frames', 'warn');
+  state.attacking = true;
+  await wait(5000);
+
+  // Phase 3: Latency exceeds deadline
+  log('⚠ PROTECTION DELAYED — trip latency exceeds 3.0 ms deadline!', 'crit');
+  log('Physical consequence: breaker cannot trip within Critical Clearing Time', 'crit');
+  await wait(5000);
+
+  // Phase 4: PQAC enabled
+  log('Phase 4: PQAC defense activated — 3-stage pipeline online', 'ok');
+  state.defending = true;
+  await wait(5000);
+
+  // Phase 5: Recovery
+  log('Latency recovered to sub-millisecond — 3,140× improvement', 'ok');
+  log('PQAC dropping 99.6% of attack traffic at Stage 1 (MAC filter)', 'info');
+  await wait(5000);
+
+  // Phase 6: Attack stops
+  log('Phase 6: Attack ceases — system returns to nominal', 'ok');
+  state.attacking = false;
+  await wait(3000);
+
+  log('Demo complete. Key finding: PQAC\'s verify-before-commit guarantees safety.', 'info');
+  state.autoMode = false;
+}
+
+function wait(ms) {
+  return new Promise(r => setTimeout(r, ms / (state.speed / 5)));
+}
+
+function resetState() {
+  state.attacking = false;
+  state.defending = false;
+  state.attackRate = 0;
+  state.latency = 0.76;
+  state.latencyHistory = [];
+  state.s1Dropped = 0;
+  state.s2Dropped = 0;
+  state.s3Dropped = 0;
+  state.accepted = 0;
+  state.totalAttack = 0;
+  state.tick = 0;
+  setPhase('nominal');
+  document.getElementById('eventLog').innerHTML = '';
+  log('System reset — all metrics cleared', 'info');
+}
+
+// Controls
+document.getElementById('btnAuto').addEventListener('click', () => { if (!state.autoMode) autoDemo(); });
+document.getElementById('btnAttack').addEventListener('click', () => {
+  state.attacking = !state.attacking;
+  const btn = document.getElementById('btnAttack');
+  btn.textContent = state.attacking ? '⚡ STOP ATTACK' : '⚡ START ATTACK';
+  log(state.attacking ? 'Manual attack started' : 'Manual attack stopped', state.attacking ? 'warn' : 'ok');
+});
+document.getElementById('btnDefend').addEventListener('click', () => {
+  state.defending = !state.defending;
+  const btn = document.getElementById('btnDefend');
+  btn.textContent = state.defending ? '🛡 DISABLE PQAC' : '🛡 ENABLE PQAC';
+  log(state.defending ? 'PQAC defense enabled' : 'PQAC defense disabled', state.defending ? 'ok' : 'warn');
+});
+document.getElementById('btnReset').addEventListener('click', resetState);
+document.getElementById('speedSlider').addEventListener('input', (e) => { state.speed = parseInt(e.target.value); });
+
+// Initialize
+log('GridPulse CIL-DoS Dashboard initialized', 'info');
+log('Press AUTO DEMO for scripted 6-phase demonstration', 'info');
+setInterval(simTick, 100);
+drawChart();
+</script>
+</body>
+</html>

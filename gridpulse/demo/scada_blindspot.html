@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCADA HMI — Blind Spot Simulator</title>
+<style>
+:root {
+  --bg: #0f1923;
+  --panel: #162232;
+  --border: #243447;
+  --text: #c8d6e5;
+  --green: #00e676;
+  --red: #ff1744;
+  --amber: #ffab00;
+  --blue: #448aff;
+  --dim: #546e7a;
+  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 20px; background: #0d1520; border-bottom: 2px solid var(--border);
+}
+.topbar h1 { font-size: 14px; font-weight: 600; letter-spacing: 0.5px; }
+.topbar .clock { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.topbar .alarm-count {
+  padding: 2px 10px; border-radius: 3px; font-size: 12px; font-weight: 700;
+}
+.alarm-ok { background: #004d40; color: var(--green); }
+.alarm-active { background: #b71c1c; color: white; animation: blink 0.8s infinite; }
+@keyframes blink { 50% { opacity: 0.5; } }
+
+.hmi-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px; padding: 1px; background: var(--border);
+}
+
+.bay {
+  background: var(--panel); padding: 16px; min-height: 200px;
+}
+.bay-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--dim); margin-bottom: 12px;
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+}
+
+/* Single-line diagram elements */
+.sld { text-align: center; padding: 8px 0; }
+.breaker {
+  display: inline-block; width: 40px; height: 20px; border: 2px solid;
+  border-radius: 3px; margin: 0 8px; font-size: 10px; font-weight: 700;
+  line-height: 16px; text-align: center;
+}
+.breaker-closed { border-color: var(--green); color: var(--green); }
+.breaker-open { border-color: var(--red); color: var(--red); }
+.breaker-stuck { border-color: var(--amber); color: var(--amber); animation: blink 0.5s infinite; }
+
+.bus-line {
+  height: 3px; background: var(--green); margin: 4px 20px;
+  border-radius: 2px;
+}
+.bus-line.de-energized { background: var(--dim); }
+
+.measurement { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+.meas-label { color: var(--dim); }
+.meas-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.meas-ok { color: var(--green); }
+.meas-warn { color: var(--amber); }
+.meas-crit { color: var(--red); }
+
+/* Status indicator */
+.status-row {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px;
+  font-size: 11px;
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot-red { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.dot-amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+/* Bottom bar */
+.bottom-bar {
+  display: flex; gap: 8px; padding: 10px 20px;
+  border-top: 2px solid var(--border); background: #0d1520;
+  align-items: center;
+}
+.scada-btn {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--panel); color: var(--text); cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+}
+.scada-btn:hover { border-color: var(--blue); }
+
+/* Reality overlay */
+.reality-overlay {
+  position: fixed; top: 0; right: 0; width: 320px; bottom: 0;
+  background: rgba(15,25,35,0.95); border-left: 2px solid var(--red);
+  padding: 16px; transform: translateX(100%); transition: transform 0.3s;
+  z-index: 100; overflow-y: auto;
+}
+.reality-overlay.visible { transform: translateX(0); }
+.reality-title {
+  font-size: 13px; font-weight: 700; color: var(--red);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+}
+.reality-item {
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.reality-item .ri-label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
+.reality-item .ri-hmi { color: var(--green); }
+.reality-item .ri-actual { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>⚡ SUBSTATION ALPHA — SCADA HMI</h1>
+  <span class="clock" id="clock">21:45:00</span>
+  <span class="alarm-count alarm-ok" id="alarmBadge">0 ALARMS</span>
+</div>
+
+<div class="hmi-grid">
+  <!-- Bay 1: 132kV Incoming -->
+  <div class="bay" id="bay1">
+    <div class="bay-title">Bay 1 — 132 kV Incoming Feeder</div>
+    <div class="sld">
+      <div class="bus-line"></div>
+      <span class="breaker breaker-closed" id="cb1">CB1</span>
+      <div class="bus-line"></div>
+    </div>
+    <div class="measurement"><span class="meas-label">Voltage</span><span class="meas-val meas-ok" id="v1">132.4 kV</span></div>
+    <div class="measurement"><span class="meas-label">Current</span><span class="meas-val meas-ok" id="i1">485 A</span></div>
+    <div class="measurement"><span class="meas-label">Power</span><span class="meas-val meas-ok" id="p1">111.2 MW</span></div>
+    <div class="measurement"><span class="meas-label">Frequency</span><span class="meas-val meas-ok" id="f1">50.01 Hz</span></div>
+    <div class="status-row"><div class="status-dot dot-green" id="dot1"></div><span id="stat1">Protection OK — Trip latency 0.8 ms</span></div>
+  </div>
+
+  <!-- Bay 2: Transformer -->
+  <div class="bay" id="bay2">
+    <div class="bay-title">Bay 2 — 132/33 kV Transformer T1</div>
+    <div class="sld">
+      <div class="bus-line"></div>
+      <span class="breaker breaker-closed" id="cb2">CB2</span>
+      <span style="font-size:20px; margin: 0 4px;">⏚</span>
+      <span class="breaker breaker-closed" id="cb3">CB3</span>
+      <div class="bus-line"></div>
+    </div>
+    <div class="measurement"><span class="meas-label">HV Side</span><span class="meas-val meas-ok" id="v2h">132.1 kV</span></div>
+    <div class="measurement"><span class="meas-label">LV Side</span><span class="meas-val meas-ok" id="v2l">33.2 kV</span></div>
+    <div class="measurement"><span class="meas-label">Oil Temp</span><span class="meas-val meas-ok" id="temp2">72.3 °C</span></div>
+    <div class="measurement"><span class="meas-label">Load</span><span class="meas-val meas-ok" id="load2">68%</span></div>
+    <div class="status-row"><div class="status-dot dot-green" id="dot2"></div><span id="stat2">Differential protection OK</span></div>
+  </div>
+
+  <!-- Bay 3: 33kV Outgoing -->
+  <div class="bay" id="bay3">
+    <div class="bay-title">Bay 3 — 33 kV Outgoing Feeder</div>
+    <div class="sld">
+      <div class="bus-line"></div>
+      <span class="breaker breaker-closed" id="cb4">CB4</span>
+      <div class="bus-line"></div>
+    </div>
+    <div class="measurement"><span class="meas-label">Voltage</span><span class="meas-val meas-ok" id="v3">33.1 kV</span></div>
+    <div class="measurement"><span class="meas-label">Current</span><span class="meas-val meas-ok" id="i3">1,940 A</span></div>
+    <div class="measurement"><span class="meas-label">Power</span><span class="meas-val meas-ok" id="p3">108.7 MW</span></div>
+    <div class="measurement"><span class="meas-label">THD</span><span class="meas-val meas-ok" id="thd3">2.1%</span></div>
+    <div class="status-row"><div class="status-dot dot-green" id="dot3"></div><span id="stat3">Overcurrent protection OK</span></div>
+  </div>
+
+  <!-- Bay 4: Bus Coupler -->
+  <div class="bay" id="bay4">
+    <div class="bay-title">Bay 4 — Bus Section Coupler</div>
+    <div class="sld">
+      <div class="bus-line"></div>
+      <span class="breaker breaker-closed" id="cb5">CB5</span>
+      <div class="bus-line"></div>
+    </div>
+    <div class="measurement"><span class="meas-label">Bus A</span><span class="meas-val meas-ok">33.1 kV</span></div>
+    <div class="measurement"><span class="meas-label">Bus B</span><span class="meas-val meas-ok">33.0 kV</span></div>
+    <div class="status-row"><div class="status-dot dot-green" id="dot4"></div><span id="stat4">Bus differential OK</span></div>
+  </div>
+
+  <!-- Bay 5: Capacitor Bank -->
+  <div class="bay" id="bay5">
+    <div class="bay-title">Bay 5 — Capacitor Bank C1</div>
+    <div class="sld">
+      <div class="bus-line"></div>
+      <span class="breaker breaker-closed" id="cb6">CB6</span>
+      <span style="font-size:16px; margin: 0 4px;">⊣⊢</span>
+    </div>
+    <div class="measurement"><span class="meas-label">Reactive</span><span class="meas-val meas-ok">25 MVAr</span></div>
+    <div class="measurement"><span class="meas-label">Steps</span><span class="meas-val meas-ok">4 / 6</span></div>
+    <div class="status-row"><div class="status-dot dot-green" id="dot5"></div><span id="stat5">Capacitor protection OK</span></div>
+  </div>
+
+  <!-- Comms Status -->
+  <div class="bay" id="bayComms">
+    <div class="bay-title">IEC 61850 Communications</div>
+    <div class="measurement"><span class="meas-label">GOOSE Pub</span><span class="meas-val meas-ok" id="goosePub">Active — 4 publishers</span></div>
+    <div class="measurement"><span class="meas-label">GOOSE Sub</span><span class="meas-val meas-ok" id="gooseSub">Active — 12 subscriptions</span></div>
+    <div class="measurement"><span class="meas-label">MMS Server</span><span class="meas-val meas-ok">Connected</span></div>
+    <div class="measurement"><span class="meas-label">NTP Sync</span><span class="meas-val meas-ok">±0.3 ms</span></div>
+    <div class="measurement"><span class="meas-label">Process Bus</span><span class="meas-val meas-ok" id="procBus">100 Mbps — No errors</span></div>
+    <div class="status-row"><div class="status-dot dot-green" id="dotComms"></div><span id="statComms">IEC 62351-6 authentication: ENABLED</span></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <span style="color: var(--dim); font-size: 11px; margin-right: 12px;">DEMONSTRATION:</span>
+  <button class="scada-btn" id="btnNormal">Normal Operation</button>
+  <button class="scada-btn" id="btnAttack" style="border-color: var(--red); color: var(--red);">Simulate CIL-DoS</button>
+  <button class="scada-btn" id="btnReveal" style="border-color: var(--amber); color: var(--amber);">Show Reality ▸</button>
+  <span style="margin-left: auto; font-size: 10px; color: var(--dim);">GridPulse SCADA Blind-Spot Simulator — For Research Demonstration Only</span>
+</div>
+
+<!-- Reality panel -->
+<div class="reality-overlay" id="realityPanel">
+  <div class="reality-title">⚠ What the Operator Can't See</div>
+  <p style="font-size: 11px; color: var(--dim); margin-bottom: 12px;">
+    During a CIL-DoS attack, the SCADA HMI shows "all green" because
+    GOOSE trip commands are delayed, not corrupted. The operator sees
+    normal readings while protection is actually blind.
+  </p>
+  <div id="realityItems"></div>
+</div>
+
+<script>
+let mode = 'normal';
+let tickCount = 0;
+let realityVisible = false;
+
+const realityData = [
+  { label: 'CB1 Trip Latency', hmi: '0.8 ms ✓', actual: '2,388 ms ✗ (796× deadline)' },
+  { label: 'Protection Status', hmi: 'OK — Green', actual: 'BLIND — trips queued behind 50k attack frames' },
+  { label: 'Alarm Count', hmi: '0 alarms', actual: '0 alarms (no alarm for delayed GOOSE)' },
+  { label: 'Bus Fault Response', hmi: 'Ready in < 3 ms', actual: 'Would take 2.4 seconds — past Critical Clearing Time' },
+  { label: 'Transformer Protection', hmi: 'Differential OK', actual: 'Trip commands stuck in verification queue' },
+  { label: 'GOOSE Status', hmi: 'Active', actual: '100,000 pps flood — IED CPU saturated' },
+  { label: 'Operator Awareness', hmi: 'Everything nominal', actual: 'Zero indication of attack on HMI' },
+];
+
+function buildRealityPanel() {
+  const el = document.getElementById('realityItems');
+  el.innerHTML = realityData.map(r =>
+    `<div class="reality-item">
+      <div class="ri-label">${r.label}</div>
+      <div>HMI shows: <span class="ri-hmi">${r.hmi}</span></div>
+      <div>Reality: <span class="ri-actual">${r.actual}</span></div>
+    </div>`
+  ).join('');
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', {hour12: false});
+}
+
+function tick() {
+  tickCount++;
+  updateClock();
+
+  // Slight measurement jitter regardless of mode
+  const jitter = () => (Math.random() - 0.5) * 0.4;
+  document.getElementById('v1').textContent = (132.4 + jitter()).toFixed(1) + ' kV';
+  document.getElementById('i1').textContent = Math.floor(485 + jitter() * 20) + ' A';
+  document.getElementById('f1').textContent = (50.01 + jitter() * 0.02).toFixed(2) + ' Hz';
+
+  if (mode === 'attack') {
+    // HMI still shows green — that's the blind spot
+    // Everything looks normal to the operator
+  }
+}
+
+document.getElementById('btnNormal').addEventListener('click', () => {
+  mode = 'normal';
+  document.getElementById('alarmBadge').className = 'alarm-count alarm-ok';
+  document.getElementById('alarmBadge').textContent = '0 ALARMS';
+  // Reset all dots to green
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById('dot' + i).className = 'status-dot dot-green';
+  }
+  document.getElementById('dotComms').className = 'status-dot dot-green';
+});
+
+document.getElementById('btnAttack').addEventListener('click', () => {
+  mode = 'attack';
+  // HMI stays green — operator is blind
+  // This IS the point: the HMI doesn't change during CIL-DoS
+});
+
+document.getElementById('btnReveal').addEventListener('click', () => {
+  realityVisible = !realityVisible;
+  document.getElementById('realityPanel').classList.toggle('visible');
+  document.getElementById('btnReveal').textContent = realityVisible ? 'Hide Reality ◂' : 'Show Reality ▸';
+});
+
+buildRealityPanel();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
