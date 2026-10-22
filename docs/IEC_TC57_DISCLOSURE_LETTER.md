@@ -12,7 +12,7 @@ Email: sapnavm@pes.edu
 
 Prajwal Chowdary M.
 Security Researcher, PES University
-Email: [your email]
+Email: chowdaryprajwal2@gmail.com
 
 Prof. Prasad B. Honnavalli
 Professor, Department of Computer Science and Engineering
@@ -24,7 +24,7 @@ Data and Communication Security
 International Electrotechnical Commission
 3 rue de Varembé, CH-1211 Geneva 20, Switzerland
 
-**Date:** [TO BE SENT AFTER PI 5 EVIDENCE IS COMPLETE]
+**Date:** [TO BE SENT — Pi 5 evidence collected October 22, 2026]
 
 **Subject:** Coordinated Disclosure — Crypto-Induced Latency Denial of
 Service (CIL-DoS) Vulnerability in IEC 62351-6 Cryptographic
@@ -73,11 +73,17 @@ delivery deadline.
    provably fail** due to the fundamental queueing-theoretic
    relationship λ_attack >> μ_verify.
 
-4. **NIST Post-Quantum Cryptography standards (FIPS 204/205) worsen
+4. **ARM Cortex-A76 silicon (Raspberry Pi 5 @ 2.4 GHz) confirms the
+   vulnerability scales beyond low-end microcontrollers**: ECDSA-P256
+   verification takes 193 µs, meaning a flood of just 5,200 pps
+   saturates the queue (ρ > 1). RSA-2048 saturates at ~9,900 pps.
+   Even on desktop-class ARM silicon, a 100K pps flood yields ρ = 10.1.
+
+5. **NIST Post-Quantum Cryptography standards (FIPS 204/205) worsen
    the vulnerability**: SLH-DSA-SHA2-128s requires 597 ms for signing
    and produces 7,856-byte signatures exceeding standard Ethernet MTU.
 
-5. **Physical grid consequences** include generator rotor angle
+6. **Physical grid consequences** include generator rotor angle
    instability past the Critical Clearing Time, transformer
    through-fault thermal damage (6.25× I²t surge), and breaker-failure
    protection blinding.
@@ -139,7 +145,7 @@ guidance.
 For technical questions or to arrange a presentation:
 
 Dr. Sapna Vikram Mewundi — sapnavm@pes.edu
-Prajwal Chowdary M. — [your email]
+Prajwal Chowdary M. — chowdaryprajwal2@gmail.com
 
 Respectfully submitted,
 
