@@ -67,12 +67,15 @@ the forgery. Legitimate fault-trip commands queue behind thousands of
 attack frames — the 3 ms safety deadline is violated 100% of the time,
 with measured queuing delays exceeding 2,388 ms.
 
-We validated CIL-DoS on real embedded silicon (ESP32 / Arduino) and
-found that a single ECDSA-P256 verification takes 310 ms — over 100x
-past the safety deadline, even without an attack. We then modeled the
-physical grid consequences: generator rotor angle divergence past the
-critical clearing time (201.6 ms), breaker-failure protection blinded,
-and a 6.25x surge in transformer thermal energy causing winding damage.
+We validated CIL-DoS on real embedded silicon (ESP32 Xtensa LX6 @
+240 MHz) and ARM server-class hardware (Raspberry Pi 5 Cortex-A76 @
+2.4 GHz) with 50,000-iteration benchmarks. A single ECDSA-P256
+verification takes 310 ms on ESP32 — over 100x past the safety
+deadline, even without an attack. Even on Pi 5 (1,603x faster), ECDSA
+saturates at just 5,164 pps. We captured 50,000 wire-format GOOSE
+frames (EtherType 0x88B8) as PCAP evidence and validated a novel
+XDP/eBPF kernel-level defense that drops 99% of attack frames at the
+NIC driver layer before any crypto runs.
 
 We also benchmarked NIST Post-Quantum Cryptography standards (ML-DSA,
 SLH-DSA, FALCON) and found that hash-based PQC makes the problem
@@ -211,11 +214,13 @@ safety-critical power grid protection. Specific novel contributions:
    weaponized to defeat the safety function it protects, requiring zero
    cryptographic keys from the attacker.
 
-2. REAL SILICON VALIDATION: All benchmarks run on actual embedded
-   hardware (ESP32 Xtensa LX6 @ 240 MHz), not desktop simulations. The
-   finding that ECDSA-P256 takes 310 ms per verification on
-   representative IED silicon — 103x past the safety deadline without
-   any attack — is new to the literature.
+2. REAL SILICON VALIDATION: Benchmarks on ESP32 (Xtensa LX6 @ 240 MHz)
+   AND Raspberry Pi 5 (ARM Cortex-A76 @ 2.4 GHz) with 50,000-iteration
+   statistical rigor. ECDSA-P256 takes 310 ms on ESP32 (103x deadline)
+   and even on Pi 5 (1,603x faster), saturates at 5,164 pps. Plus:
+   50,000-frame PCAP capture and XDP/eBPF kernel-level PQAC defense
+   validated in native mode on Linux 6.18 — 99% attack drop rate at
+   the NIC driver layer.
 
 3. FULL CYBER-TO-PHYSICAL CHAIN: Prior ICS security work stops at
    packet delays. We model through to generator rotor angle divergence,
@@ -443,8 +448,9 @@ commercial products or services related to ICS/SCADA security.
 ### Supporting Materials
 
 ```
-[Link to the GridPulse GitHub repository — public, no login required]
-[Link to the pre-print paper PDF — optional, if publicly available]
+GitHub: https://github.com/sapnadfir-blip/gridpulse
+Research Paper: GridPulse_Research_Paper.pdf (attached)
+Technical Report: GridPulse_Technical_Report.pdf (attached)
 ```
 
 ---

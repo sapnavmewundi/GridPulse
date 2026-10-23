@@ -1,0 +1,13 @@
+metric,value,description
+total_frames,50101,Total frames processed by XDP
+not_goose,1,Non-GOOSE frames (passed through)
+stage1_mac_drop,49500,Dropped by MAC allowlist (attack frames)
+stage2_stnum_drop,10,Dropped by stNum plausibility check
+stage3_passed,590,Passed to userspace for crypto verify (500 legit + 90 edge cases)
+attack_frames_sent,49500,Total attack frames in flood
+legit_frames_sent,600,Total legitimate frames (100 baseline + 500 mixed)
+attack_drop_rate,99.0%,Attack frames dropped before crypto
+flood_rate_pps,6427,Sustained attack rate
+platform,Raspberry Pi 5 BCM2712 Cortex-A76 @ 2.4GHz,Hardware
+xdp_mode,native,XDP attach mode (not generic)
+kernel,6.18.50+rpt-rpi-2712,Linux kernel version

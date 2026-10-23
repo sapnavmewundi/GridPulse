@@ -181,7 +181,7 @@ Disclosure Timeline:
   - October 7, 2026: Academic manuscript submitted to IEEE TSG
   - October 22, 2026: Raspberry Pi 5 ARM Cortex-A76 hardware evidence collected
   - [NEXT]: IEC TC 57 WG 15 disclosure letter sent
-  - [NEXT]: CVE ID requested from MITRE
+  - [NEXT]: CVE ID requested from CISA VINCE-NT (ICS Root CNA)
   - [TARGET]: Coordinated public disclosure at Black Hat Asia 2027 (March 2027)
 ```
 
@@ -241,7 +241,7 @@ vendor's implementation. All compliant implementations are affected.
 ```
 - IEC 62351-6:2020 standard specification
 - IEC 61850-8-1 (GOOSE protocol specification)
-- IEEE Std C37.111 (protection relay timing requirements)
+- IEC 61850-5 (communication requirements for functions and device models — defines Performance Classes P1/P2/P3 and the 3 ms transfer time constraint)
 - IEEE Std C57.109-2018 (transformer through-fault protection)
 - Mewundi et al., "Crypto-Induced Latency Denial of Service in
   IEC 61850 Substation Communications," submitted to IEEE TSG, 2026
@@ -254,7 +254,7 @@ vendor's implementation. All compliant implementations are affected.
 
 - [x] ESP32 hardware benchmarks (DONE — results/esp32_crypto_benchmark.csv)
 - [x] Raspberry Pi 5 hardware benchmarks (DONE — results/pi5_crypto_benchmark.csv)
-- [ ] Real GOOSE PCAP capture from Pi 5 testbed (PENDING — needs USB-C Ethernet adapter)
+- [x] Real GOOSE PCAP capture from Pi 5 testbed (DONE — results/pcap/, 50K mixed frames)
 - [x] Docker testbed verified and documented (DONE)
 - [x] Wireshark GOOSE CIL-DoS dissector (DONE — tools/wireshark/)
 - [x] Adaptive attacker module (DONE — gridpulse/attacks/adaptive_cildos.py)
@@ -276,10 +276,10 @@ Phase 1 (COMPLETE — October 22, 2026):
   ✅ Build adaptive attacker (gridpulse/attacks/adaptive_cildos.py)
   ✅ Run Pi 5 ARM Cortex-A76 crypto benchmarks (results/pi5_crypto_benchmark.csv)
 
-Phase 2 (NEXT — when USB-C Ethernet adapter arrives):
-  ⬜ Capture real GOOSE PCAP over Ethernet on Pi 5
-  ⬜ Run native CIL-DoS attack simulation on Pi 5
-  ⬜ Run XDP/eBPF defense on Pi 5
+Phase 2 (COMPLETE — October 22, 2026, virtual bridge on Pi 5):
+  ✅ Capture real GOOSE PCAP on Pi 5 (results/pcap/, 50K frames)
+  ✅ Run native CIL-DoS attack simulation on Pi 5 (6,423 pps achieved)
+  ✅ Run XDP/eBPF PQAC defense on Pi 5 (DONE — 99% attack drop at XDP layer, native mode)
 
 Phase 3 (SUBMIT — before November 1, 2026):
   ⬜ Submit to CISA VINCE-NT (https://vulnerabilities.cisa.gov)
