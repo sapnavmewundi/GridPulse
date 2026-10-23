@@ -206,7 +206,7 @@ All evidence is publicly reproducible:
    Dataset: results/pi5_crypto_benchmark.csv
 
 3. DOCKER TESTBED REPRODUCTION (single command):
-   Repository: https://github.com/sapnadfir-blip/gridpulse
+   Repository: https://github.com/sapnavmewundi/GridPulse
    Command: docker compose run --rm subscriber --mode fifo --attack-rate 100000
    Result: Trip latency > 2,388 ms, 100% deadline violation
 
@@ -245,7 +245,7 @@ vendor's implementation. All compliant implementations are affected.
 - IEEE Std C57.109-2018 (transformer through-fault protection)
 - Mewundi et al., "Crypto-Induced Latency Denial of Service in
   IEC 61850 Substation Communications," submitted to IEEE TSG, 2026
-- Open-source toolkit: https://github.com/sapnadfir-blip/gridpulse
+- Open-source toolkit: https://github.com/sapnavmewundi/GridPulse
 ```
 
 ---

@@ -448,9 +448,7 @@ commercial products or services related to ICS/SCADA security.
 ### Supporting Materials
 
 ```
-GitHub: https://github.com/sapnadfir-blip/gridpulse
-Research Paper: GridPulse_Research_Paper.pdf (attached)
-Technical Report: GridPulse_Technical_Report.pdf (attached)
+GitHub: https://github.com/sapnavmewundi/GridPulse
 ```
 
 ---
